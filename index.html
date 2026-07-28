@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atlas AI Agent Terminal</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 750px;
+            height: 90vh;
+            background-color: #1e293b;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #334155;
+        }
+
+        .chat-header {
+            padding: 14px 20px;
+            background-color: #0f172a;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-header h2 {
+            font-size: 1.1rem;
+            color: #38bdf8;
+        }
+
+        .client-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .client-selector label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        .client-selector select {
+            background-color: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #334155;
+            padding: 6px 10px;
+            border-radius: 6px;
+            outline: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-add-client {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-add-client:hover {
+            background-color: #0369a1;
+        }
+
+        /* Database Quick Actions Toolbar */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            padding: 10px 16px;
+            background-color: #162032;
+            border-bottom: 1px solid #334155;
+        }
+
+        .toolbar button {
+            background-color: #334155;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toolbar button:hover {
+            background-color: #0284c7;
+            color: #fff;
+            border-color: #0284c7;
+        }
+
+        .chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.92rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background-color: #0284c7;
+            color: #ffffff;
+            border-bottom-right-radius: 2px;
+        }
+
+        .message.bot {
+            align-self: flex-start;
+            background-color: #334155;
+            color: #f1f5f9;
+            border-bottom-left-radius: 2px;
+        }
+
+        .message img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid #475569;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            display: block;
+        }
+
+        .input-container {
+            padding: 16px;
+            background-color: #0f172a;
+            border-top: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .input-container input:focus {
+            border-color: #38bdf8;
+        }
+
+        .input-container button {
+            background-color: #0284c7;
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .input-container button:hover {
+            background-color: #0369a1;
+        }
+
+        .input-container button svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>🌐 Atlas AI Database Terminal</h2>
+            
+            <div class="client-selector">
+                <label for="clientSelect">Client:</label>
+                <select id="clientSelect" onchange="switchClient()">
+                    <!-- Options loaded dynamically -->
+                </select>
+                <button class="btn-add-client" onclick="promptCreateClient()">+ New</button>
+            </div>
+        </div>
+
+        <!-- Toolbar for direct SQLite queries -->
+        <div class="toolbar">
+            <button onclick="fetchTasks()">📋 View Tasks</button>
+            <button onclick="fetchEmployees()">👥 View Employees</button>
+            <button onclick="fetchDbOverview()">📊 Full DB State</button>
+        </div>
+
+        <div class="chat-box" id="chatBox">
+            <div class="message bot">Connected to SQLite database. Active client context: <b id="activeClientTag">fral</b>.</div>
+        </div>
+
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="Ask Atlas or enter DB command..." onkeydown="handleKeyPress(event)">
+            <button id="sendBtn" onclick="sendCommand()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = "http://127.0.0.1:8000";
+
+        // Load Client List on Initialization
+        window.addEventListener("DOMContentLoaded", () => {
+            loadClients();
+        });
+
+        async function loadClients(selectClient = null) {
+            try {
+                const res = await fetch(`${BASE_URL}/clients/list`);
+                const data = await res.json();
+                const select = document.getElementById("clientSelect");
+                select.innerHTML = "";
+
+                const clients = data.clients || ["fral", "Default Client"];
+                clients.forEach(c => {
+                    const opt = document.createElement("option");
+                    opt.value = c;
+                    opt.textContent = c;
+                    select.appendChild(opt);
+                });
+
+                if (selectClient) {
+                    select.value = selectClient;
+                }
+                switchClient();
+            } catch (err) {
+                console.error("Failed to load client list:", err);
+            }
+        }
+
+        async function promptCreateClient() {
+            const name = prompt("Enter new client context name:");
+            if (!name || !name.trim()) return;
+
+            try {
+                const res = await fetch(`${BASE_URL}/clients/create`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ client_name: name.trim() })
+                });
+
+                if (res.ok) {
+                    appendMessage(`➕ Created new client context: '<b>${name.trim()}</b>'`, "bot");
+                    await loadClients(name.trim());
+                }
+            } catch (err) {
+                appendMessage(`⚠️ Error creating client: ${err.message}`, "bot");
+            }
+        }
+
+        function getActiveClient() {
+            return document.getElementById("clientSelect").value || "Default Client";
+        }
+
+        function switchClient() {
+            const client = getActiveClient();
+            document.getElementById("activeClientTag").innerText = client;
+        }
+
+        function makeImgTag(b64String) {
+            return b64String ? `<br><img src="data:image/png;base64,${b64String}" alt="Visual Summary" />` : "";
+        }
+
+        async function sendCommand() {
+            const input = document.getElementById("userInput");
+            const text = input.value.trim();
+            const client = getActiveClient();
+
+            if (!text) return;
+
+            appendMessage(text, "user");
+            input.value = "";
+            const loadingDiv = appendMessage("Processing command...", "bot");
+
+            try {
+                const response = await fetch(`${BASE_URL}/agent/command`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prompt: text, client_name: client })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    if (data.actions_executed && data.actions_executed.length > 0) {
+                        let outHtml = "🎯 <b>Execution Summary:</b><br>";
+                        data.actions_executed.forEach(act => {
+                            if (act.action === "add_task") {
+                                outHtml += `✅ Added Task: "${act.title}" (${act.priority})<br>`;
+                            } else if (act.action === "register_employee") {
+                                outHtml += `👤 Registered Employee: ${act.name} (ID: ${act.employee_id})<br>`;
+                            } else if (act.action === "list_tasks") {
+                                outHtml += `📋 Listed Tasks for '${client}'${makeImgTag(act.image)}<br>`;
+                            } else if (act.action === "list_employees") {
+                                outHtml += `👥 Listed Employees for '${client}'${makeImgTag(act.image)}<br>`;
+                            } else if (act.action === "view_database") {
+                                outHtml += `📊 Fetched Full DB State${makeImgTag(act.images?.employees)}${makeImgTag(act.images?.tasks)}<br>`;
+                            } else if (act.action === "general_chat") {
+                                outHtml += `💬 ${act.reply}<br>`;
+                            } else {
+                                outHtml += `⚙️ Executed ${act.action}<br>`;
+                            }
+                        });
+                        loadingDiv.innerHTML = outHtml;
+                    } else {
+                        loadingDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    }
+                } else {
+                    loadingDiv.innerHTML = `Error: ${data.detail || 'Command failed.'}`;
+                }
+            } catch (err) {
+                loadingDiv.innerHTML = `⚠️ Connection error: ${err.message}`;
+            }
+        }
+
+        async function fetchEmployees() {
+            const client = getActiveClient();
+            const loadingDiv = appendMessage(`Fetching employees for '${client}'...`, "bot");
+            try {
+                const res = await fetch(`${BASE_URL}/employees/list?client_name=${encodeURIComponent(client)}`);
+                const data = await res.json();
+                
+                let html = "";
+                if (!data.employees || data.employees.length === 0) {
+                    html = `No employees registered under '${client}'.`;
+                } else {
+                    html = `👥 <b>Employee Directory (${client}):</b><br>`;
+                    data.employees.forEach(e => {
+                        const salary = e.salary ? Number(e.salary).toLocaleString() : '0';
+                        html += `• [ID: ${e.id}] ${e.name} - ${e.role} ($${salary}/mo)<br>`;
+                    });
+                }
+
+                html += makeImgTag(data.image);
+                loadingDiv.innerHTML = html;
+            } catch (err) {
+                loadingDiv.innerHTML = `⚠️ Error fetching employees: ${err.message}`;
+            }
+        }
+
+        async function fetchTasks() {
+            const client = getActiveClient();
+            const loadingDiv = appendMessage(`Fetching tasks for '${client}'...`, "bot");
+            try {
+                const res = await fetch(`${BASE_URL}/tasks/list?client_name=${encodeURIComponent(client)}`);
+                const data = await res.json();
+                
+                let html = "";
+                if (!data.tasks || data.tasks.length === 0) {
+                    html = `No active tasks found for '${client}'.`;
+                } else {
+                    html = `📋 <b>Tasks for ${client}:</b><br>`;
+                    data.tasks.forEach(t => {
+                        html += `• [ID: ${t.id || 'N/A'}] (${t.priority}) ${t.title}<br>`;
+                    });
+                }
+
+                html += makeImgTag(data.image);
+                loadingDiv.innerHTML = html;
+            } catch (err) {
+                loadingDiv.innerHTML = `⚠️ Error fetching tasks: ${err.message}`;
+            }
+        }
+
+        async function fetchDbOverview() {
+            const client = getActiveClient();
+            const loadingDiv = appendMessage(`Fetching full DB overview for '${client}'...`, "bot");
+            try {
+                const res = await fetch(`${BASE_URL}/database/state?client_name=${encodeURIComponent(client)}`);
+                const data = await res.json();
+                
+                let html = `📊 <b>Database State (${client}):</b><br><br>`;
+                
+                const emps = data.state?.employees || [];
+                html += `👥 <b>Registered Employees (${emps.length}):</b><br>`;
+                if (emps.length === 0) {
+                    html += `&nbsp;&nbsp;(None)<br>`;
+                } else {
+                    emps.forEach(e => {
+                        html += `&nbsp;&nbsp;• [ID: ${e.id}] ${e.name} (${e.role}) - $${Number(e.salary || 0).toLocaleString()}/mo<br>`;
+                    });
+                }
+
+                const tasks = data.state?.tasks || [];
+                html += `<br>📋 <b>Pending Tasks (${tasks.length}):</b><br>`;
+                if (tasks.length === 0) {
+                    html += `&nbsp;&nbsp;(None)<br>`;
+                } else {
+                    tasks.forEach(t => {
+                        html += `&nbsp;&nbsp;• [ID: ${t.id || 'N/A'}] (${t.priority}) ${t.title}<br>`;
+                    });
+                }
+
+                if (data.images) {
+                    html += makeImgTag(data.images.employees);
+                    html += makeImgTag(data.images.tasks);
+                }
+
+                loadingDiv.innerHTML = html;
+            } catch (err) {
+                loadingDiv.innerHTML = `⚠️ Error fetching DB state: ${err.message}`;
+            }
+        }
+
+        function appendMessage(content, sender) {
+            const chatBox = document.getElementById("chatBox");
+            const msgDiv = document.createElement("div");
+            msgDiv.classList.add("message", sender);
+            msgDiv.innerHTML = content;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return msgDiv;
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === "Enter") sendCommand();
+        }
+    </script>
+</body>
+</html>
