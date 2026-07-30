@@ -3,226 +3,615 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas AI Agent Terminal</title>
+    <title>NorTA AI Agent Terminal</title>
+    
+    <!-- Nimiq Hub API Browser Standalone Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/@nimiq/hub-api@v1.2.3/dist/standalone/HubApi.standalone.umd.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
     <style>
+        :root {
+            /* Surface Tokens */
+            --bg-root: #f8fafc;
+            --bg-surface: #0f172a;
+            --bg-surface-elevated: #1e293b;
+            --bg-input: #151d2a;
+            
+            /* Border Tokens */
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-medium: rgba(255, 255, 255, 0.16);
+            --border-accent: rgba(56, 189, 248, 0.4);
+
+            /* Brand & Accent Tokens */
+            --brand-primary: #0284c7;
+            --brand-primary-hover: #0369a1;
+            --brand-accent: #38bdf8;
+            --brand-glow: rgba(56, 189, 248, 0.15);
+            --nimiq-gold: #e9b213;
+
+            /* Text Tokens */
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            /* Typography */
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background-color: #0f172a;
-            color: #f8fafc;
+            background-color: var(--bg-root);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
+            padding: clamp(0.75rem, 2vw, 2rem);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(2, 132, 199, 0.03) 0%, transparent 60%),
+                radial-gradient(circle at 80% 100%, rgba(15, 23, 42, 0.02) 0%, transparent 40%);
         }
 
-        .chat-container {
+        .hidden {
+            display: none !important;
+        }
+
+        /* Gate Screen (Initial Wallet Login) */
+        .gate-container {
             width: 100%;
-            max-width: 750px;
-            height: 90vh;
-            background-color: #1e293b;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            max-width: 480px;
+            background-color: var(--bg-surface);
+            border-radius: 16px;
+            padding: 32px 24px;
+            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+            border: 1px solid var(--border-subtle);
+            text-align: center;
+        }
+
+        .gate-container h2 {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .gate-container p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .gate-btn {
+            background-color: var(--nimiq-gold);
+            color: #1f2348;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(233, 178, 19, 0.2);
+        }
+
+        .gate-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* Main Chat Container Layout */
+        .chat-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            height: clamp(600px, 88vh, 900px);
+            background-color: var(--bg-surface);
+            border-radius: 16px;
+            box-shadow: 
+                0 25px 50px -12px rgba(15, 23, 42, 0.25),
+                0 0 0 1px rgba(15, 23, 42, 0.08);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            border: 1px solid #334155;
         }
 
+        /* Frozen Overlay Styles */
+        .frozen-overlay {
+            position: absolute;
+            top: 55px; /* Sits below header so Disconnect button is interactive */
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .frozen-card {
+            background-color: var(--bg-surface-elevated);
+            border: 1px solid var(--border-medium);
+            padding: 32px 28px;
+            border-radius: 16px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .frozen-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .frozen-card p {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .view-btn {
+            background-color: var(--brand-primary);
+            color: #ffffff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+        }
+
+        .view-btn:hover {
+            background-color: var(--brand-primary-hover);
+            transform: translateY(-1px);
+        }
+
+        /* Header */
         .chat-header {
-            padding: 14px 20px;
-            background-color: #0f172a;
-            border-bottom: 1px solid #334155;
+            position: relative;
+            z-index: 101; /* Above overlay so Disconnect is clickable */
+            padding: 14px 24px;
+            background-color: rgba(15, 23, 42, 0.95);
+            border-bottom: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
         }
 
-        .chat-header h2 {
-            font-size: 1.1rem;
-            color: #38bdf8;
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-title h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+        }
+
+        .brand-badge {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            background: var(--brand-glow);
+            color: var(--brand-accent);
+            padding: 2px 8px;
+            border-radius: 20px;
+            border: 1px solid var(--border-accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Controls & Selectors */
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .client-selector {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
 
         .client-selector label {
-            font-size: 0.85rem;
-            color: #94a3b8;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .select-wrapper {
+            position: relative;
         }
 
         .client-selector select {
-            background-color: #1e293b;
-            color: #38bdf8;
-            border: 1px solid #334155;
-            padding: 6px 10px;
-            border-radius: 6px;
+            appearance: none;
+            background-color: var(--bg-surface-elevated);
+            color: var(--brand-accent);
+            border: 1px solid var(--border-subtle);
+            padding: 6px 32px 6px 12px;
+            border-radius: 8px;
             outline: none;
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            font-weight: 500;
             cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .client-selector select:hover {
+            border-color: var(--border-medium);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .select-wrapper::after {
+            content: '▾';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--brand-accent);
+            pointer-events: none;
+            font-size: 0.75rem;
         }
 
         .btn-add-client {
-            background-color: #0284c7;
-            color: white;
-            border: none;
-            padding: 6px 10px;
-            border-radius: 6px;
+            background-color: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-medium);
+            padding: 6px 12px;
+            border-radius: 8px;
             font-size: 0.8rem;
             cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
         }
 
         .btn-add-client:hover {
-            background-color: #0369a1;
+            background-color: var(--bg-surface-elevated);
+            border-color: var(--brand-accent);
+            color: var(--brand-accent);
         }
 
-        /* Database Quick Actions Toolbar */
+        .btn-disconnect {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-disconnect:hover {
+            background-color: rgba(239, 68, 68, 0.25);
+            border-color: #f87171;
+        }
+
+        /* Quick Action Toolbar */
         .toolbar {
             display: flex;
             gap: 8px;
-            padding: 10px 16px;
-            background-color: #162032;
-            border-bottom: 1px solid #334155;
+            padding: 10px 24px;
+            background-color: rgba(17, 24, 39, 0.4);
+            border-bottom: 1px solid var(--border-subtle);
+            overflow-x: auto;
         }
 
-        .toolbar button {
-            background-color: #334155;
-            color: #e2e8f0;
-            border: 1px solid #475569;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.8rem;
+        .toolbar-btn {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .toolbar button:hover {
-            background-color: #0284c7;
-            color: #fff;
-            border-color: #0284c7;
+        .toolbar-btn:hover {
+            background-color: var(--brand-glow);
+            color: var(--brand-accent);
+            border-color: var(--border-accent);
+            transform: translateY(-1px);
         }
 
+        /* Chat Messages Stream */
         .chat-box {
             flex: 1;
-            padding: 20px;
+            padding: 24px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-box::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-box::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-box::-webkit-scrollbar-thumb {
+            background: var(--border-medium);
+            border-radius: 3px;
         }
 
         .message {
-            max-width: 85%;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 0.92rem;
-            line-height: 1.5;
-            white-space: pre-wrap;
+            max-width: 82%;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            word-break: break-word;
+            animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .message.user {
             align-self: flex-end;
-            background-color: #0284c7;
+            background-color: var(--brand-primary);
             color: #ffffff;
-            border-bottom-right-radius: 2px;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
         }
 
         .message.bot {
             align-self: flex-start;
-            background-color: #334155;
-            color: #f1f5f9;
-            border-bottom-left-radius: 2px;
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-subtle);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message b {
+            color: var(--brand-accent);
+            font-weight: 600;
+        }
+
+        .message pre {
+            font-family: var(--font-mono);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 8px;
+            overflow-x: auto;
+            font-size: 0.82rem;
+            border: 1px solid var(--border-subtle);
         }
 
         .message img {
             max-width: 100%;
             height: auto;
             border-radius: 8px;
-            margin-top: 10px;
-            border: 1px solid #475569;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            margin-top: 12px;
+            border: 1px solid var(--border-medium);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
             display: block;
         }
 
-        .input-container {
-            padding: 16px;
-            background-color: #0f172a;
-            border-top: 1px solid #334155;
+        /* Context Separator Divider */
+        .context-divider {
             display: flex;
             align-items: center;
-            gap: 10px;
+            text-align: center;
+            margin: 12px 0;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
-        .input-container input {
+        .context-divider::before,
+        .context-divider::after {
+            content: '';
             flex: 1;
+            border-bottom: 1px dashed var(--border-medium);
+        }
+
+        .context-divider span {
+            padding: 0 12px;
+        }
+
+        /* Inline Loading Spinner */
+        .spinner-inline {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--brand-accent);
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Command Input Area */
+        .input-container {
+            padding: 16px 24px;
+            background-color: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-wrapper input {
+            width: 100%;
             padding: 12px 16px;
-            background-color: #1e293b;
-            border: 1px solid #475569;
-            border-radius: 8px;
-            color: #ffffff;
-            font-size: 0.95rem;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
             outline: none;
+            transition: all 0.2s ease;
         }
 
-        .input-container input:focus {
-            border-color: #38bdf8;
+        .input-wrapper input:focus {
+            border-color: var(--brand-accent);
+            box-shadow: 0 0 0 3px var(--brand-glow);
+            background-color: var(--bg-surface);
         }
 
-        .input-container button {
-            background-color: #0284c7;
+        .input-wrapper input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .send-btn {
+            background-color: var(--brand-primary);
             border: none;
             color: white;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
         }
 
-        .input-container button:hover {
-            background-color: #0369a1;
+        .send-btn:hover {
+            background-color: var(--brand-primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
         }
 
-        .input-container button svg {
-            width: 20px;
-            height: 20px;
+        .send-btn:active {
+            transform: translateY(0);
+        }
+
+        .send-btn svg {
+            width: 18px;
+            height: 18px;
             fill: currentColor;
+        }
+
+        @media (max-width: 640px) {
+            .chat-header {
+                padding: 12px 16px;
+            }
+            .toolbar {
+                padding: 8px 16px;
+            }
+            .chat-box {
+                padding: 16px;
+            }
+            .input-container {
+                padding: 12px 16px;
+            }
+            .message {
+                max-width: 90%;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div class="chat-container">
-        <div class="chat-header">
-            <h2>🌐 Atlas AI</h2>
-            
-            <div class="client-selector">
-                <label for="clientSelect">Client:</label>
-                <select id="clientSelect" onchange="switchClient()">
-                    <!-- Options loaded dynamically -->
-                </select>
-                <button class="btn-add-client" onclick="promptCreateClient()">+ New</button>
+    <!-- SECTION 1: Gate Screen (Initial Wallet Login) -->
+    <div id="gateScreen" class="gate-container">
+        <h2>🔒 NorTA AI Terminal Login</h2>
+        <p>Connect your Nimiq wallet to launch the terminal interface.</p>
+        <button id="connectBtn" class="gate-btn" onclick="handleWalletConnect()">Connect Nimiq Wallet</button>
+        <p id="gateError" style="color: #f87171; font-size: 0.85rem; margin-top: 12px; margin-bottom: 0;"></p>
+    </div>
+
+    <!-- SECTION 2: Terminal Application Screen -->
+    <div id="appScreen" class="chat-container hidden">
+        
+        <!-- Frozen Glass Overlay (Blocks interactions until unlocked) -->
+        <div id="frozenOverlay" class="frozen-overlay">
+            <div class="frozen-card">
+                <h3>❄️ Terminal Access Locked</h3>
+                <p></p>
+                <button class="view-btn" onclick="handleViewTerminal()">View Terminal</button>
+                <p id="payError" style="color: #f87171; font-size: 0.85rem; margin-top: 12px; margin-bottom: 0;"></p>
             </div>
         </div>
 
-        <!-- Toolbar for direct SQLite queries -->
+        <div class="chat-header">
+            <div class="brand-title">
+                <h2>🌐 NorTA AI</h2>
+                <span class="brand-badge">Terminal</span>
+            </div>
+            
+            <div class="header-controls">
+                <div class="client-selector">
+                    <label for="clientSelect">Context:</label>
+                    <div class="select-wrapper">
+                        <select id="clientSelect" onchange="switchClient()">
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
+                    <button class="btn-add-client" onclick="promptCreateClient()">
+                        <span>+</span> New
+                    </button>
+                </div>
+
+                <!-- Active Wallet Disconnect Button -->
+                <button class="btn-disconnect" onclick="disconnectWallet()">Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Database Quick Actions Toolbar -->
         <div class="toolbar">
-            <button onclick="fetchTasks()">📋 View Tasks</button>
-            <button onclick="fetchEmployees()">👥 View Employees</button>
-            <button onclick="fetchDbOverview()">📊 Full DB State</button>
+            <button class="toolbar-btn" onclick="fetchTasks()">📋 View Tasks</button>
+            <button class="toolbar-btn" onclick="fetchEmployees()">👥 View Employees</button>
+            <button class="toolbar-btn" onclick="fetchDbOverview()">📊 Full DB State</button>
         </div>
 
         <div class="chat-box" id="chatBox">
@@ -230,10 +619,12 @@
         </div>
 
         <div class="input-container">
-            <input type="text" id="userInput" placeholder="Ask Atlas or enter DB command..." onkeydown="handleKeyPress(event)">
-            <button id="sendBtn" onclick="sendCommand()">
+            <div class="input-wrapper">
+                <input type="text" id="userInput" placeholder="Ask Atlas or enter DB command..." onkeydown="handleKeyPress(event)">
+            </div>
+            <button class="send-btn" id="sendBtn" onclick="sendCommand()" aria-label="Send Command">
                 <svg viewBox="0 0 24 24">
-                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                 </svg>
             </button>
         </div>
@@ -242,14 +633,134 @@
     <script>
         const BASE_URL = "https://atlas-lg7k.onrender.com";
 
-        // Load Client List on Initialization
+        // Nimiq Mainnet Configuration
+        const NIMIQ_APP_NAME = 'NorTA AI Terminal';
+        
+        // Initialize Hub API (Mainnet Setup)
+        const hubApi = new HubApi('https://hub.nimiq.com');
+
+        let currentContext = "";
+
+        // Page Load Session Check
         window.addEventListener("DOMContentLoaded", () => {
-            loadClients();
+            const storedAddress = localStorage.getItem("nimiq_user_address");
+            const isUnlocked = localStorage.getItem("nimiq_unlocked") === "true";
+
+            if (storedAddress) {
+                document.getElementById("gateScreen").classList.add("hidden");
+                document.getElementById("appScreen").classList.remove("hidden");
+                loadClients();
+
+                if (isUnlocked) {
+                    unfreezeTerminal();
+                } else {
+                    freezeTerminal();
+                }
+            }
         });
+
+        // Cryptographic Authentication Headers Generator
+        function getAuthHeaders() {
+            const address = localStorage.getItem("nimiq_user_address") || "";
+            const signature = localStorage.getItem("nimiq_auth_signature") || "";
+            return {
+                "Content-Type": "application/json",
+                "X-Nimiq-Address": address,
+                "X-Nimiq-Signature": signature
+            };
+        }
+
+        // Step 1: Normal Wallet Connect (Onboarding)
+        async function handleWalletConnect() {
+            const errorEl = document.getElementById("gateError");
+            errorEl.textContent = "";
+
+            try {
+                // Select Address from Wallet Hub
+                const result = await hubApi.chooseAddress({
+                    appName: NIMIQ_APP_NAME
+                });
+
+                const address = result?.address;
+
+                if (!address) {
+                    throw new Error("Wallet connection cancelled.");
+                }
+
+                // Store user address
+                localStorage.setItem("nimiq_user_address", address);
+
+                // Open App & Apply Freeze Layer
+                document.getElementById("gateScreen").classList.add("hidden");
+                document.getElementById("appScreen").classList.remove("hidden");
+                loadClients();
+                freezeTerminal();
+
+            } catch (err) {
+                console.error("Wallet connect failed:", err);
+                errorEl.textContent = err.message || "Connection failed. Please try again.";
+            }
+        }
+
+        // Step 2: Off-Chain Wallet Signature (Option 1 — 0 NIM, Instant)
+        async function handleViewTerminal() {
+            const errorEl = document.getElementById("payError");
+            errorEl.textContent = "";
+
+            const signerAddress = localStorage.getItem("nimiq_user_address");
+
+            try {
+                // Sign off-chain verification message without publishing a payload to the blockchain
+                const signedMessage = await hubApi.signMessage({
+                    appName: NIMIQ_APP_NAME,
+                    signer: signerAddress || undefined,
+                    message: "Authorize command: view_database"
+                });
+
+                if (!signedMessage || !signedMessage.signature) {
+                    throw new Error("Signature request cancelled or invalid.");
+                }
+
+                // Save signature and session unlock state
+                localStorage.setItem("nimiq_auth_signature", JSON.stringify(signedMessage.signature));
+                localStorage.setItem("nimiq_unlocked", "true");
+
+                // Unfreeze Interface
+                unfreezeTerminal();
+
+            } catch (err) {
+                console.error("Signature authorization failed:", err);
+                errorEl.textContent = err.message || "Authorization failed. Try again.";
+            }
+        }
+
+        // Interface Freeze Controls
+        function freezeTerminal() {
+            document.getElementById("frozenOverlay").classList.remove("hidden");
+        }
+
+        function unfreezeTerminal() {
+            document.getElementById("frozenOverlay").classList.add("hidden");
+        }
+
+        // Disconnect Session & Reset
+        function disconnectWallet() {
+            localStorage.removeItem("nimiq_user_address");
+            localStorage.removeItem("nimiq_auth_signature");
+            localStorage.removeItem("nimiq_tx_hash");
+            localStorage.removeItem("nimiq_unlocked");
+
+            document.getElementById("appScreen").classList.add("hidden");
+            document.getElementById("gateScreen").classList.remove("hidden");
+        }
+
+        // --- Terminal API Integrations ---
 
         async function loadClients(selectClient = null) {
             try {
-                const res = await fetch(`${BASE_URL}/clients/list`);
+                const res = await fetch(`${BASE_URL}/clients/list`, {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 const select = document.getElementById("clientSelect");
                 select.innerHTML = "";
@@ -278,7 +789,7 @@
             try {
                 const res = await fetch(`${BASE_URL}/clients/create`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ client_name: name.trim() })
                 });
 
@@ -298,10 +809,29 @@
         function switchClient() {
             const client = getActiveClient();
             document.getElementById("activeClientTag").innerText = client;
+
+            if (currentContext && currentContext !== client) {
+                appendContextDivider(`Switched context to ${client}`);
+            }
+            currentContext = client;
+        }
+
+        function appendContextDivider(label) {
+            const chatBox = document.getElementById("chatBox");
+            const div = document.createElement("div");
+            div.className = "context-divider";
+            div.innerHTML = `<span>${label}</span>`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function makeImgTag(b64String) {
-            return b64String ? `<br><img src="data:image/png;base64,${b64String}" alt="Visual Summary" />` : "";
+            return b64String ? `<br><img src="data:image/png;base64,${b64String}" alt="Visual Summary" onload="scrollChatToBottom()" />` : "";
+        }
+
+        function scrollChatToBottom() {
+            const chatBox = document.getElementById("chatBox");
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         async function sendCommand() {
@@ -313,12 +843,12 @@
 
             appendMessage(text, "user");
             input.value = "";
-            const loadingDiv = appendMessage("Processing command...", "bot");
+            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Processing command...`, "bot");
 
             try {
                 const response = await fetch(`${BASE_URL}/agent/command`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ prompt: text, client_name: client })
                 });
 
@@ -357,9 +887,11 @@
 
         async function fetchEmployees() {
             const client = getActiveClient();
-            const loadingDiv = appendMessage(`Fetching employees for '${client}'...`, "bot");
+            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching employees for '${client}'...`, "bot");
             try {
-                const res = await fetch(`${BASE_URL}/employees/list?client_name=${encodeURIComponent(client)}`);
+                const res = await fetch(`${BASE_URL}/employees/list?client_name=${encodeURIComponent(client)}`, {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 
                 let html = "";
@@ -382,9 +914,11 @@
 
         async function fetchTasks() {
             const client = getActiveClient();
-            const loadingDiv = appendMessage(`Fetching tasks for '${client}'...`, "bot");
+            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching tasks for '${client}'...`, "bot");
             try {
-                const res = await fetch(`${BASE_URL}/tasks/list?client_name=${encodeURIComponent(client)}`);
+                const res = await fetch(`${BASE_URL}/tasks/list?client_name=${encodeURIComponent(client)}`, {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 
                 let html = "";
@@ -406,9 +940,11 @@
 
         async function fetchDbOverview() {
             const client = getActiveClient();
-            const loadingDiv = appendMessage(`Fetching full DB overview for '${client}'...`, "bot");
+            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching full DB overview for '${client}'...`, "bot");
             try {
-                const res = await fetch(`${BASE_URL}/database/state?client_name=${encodeURIComponent(client)}`);
+                const res = await fetch(`${BASE_URL}/database/state?client_name=${encodeURIComponent(client)}`, {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 
                 let html = `📊 <b>Database State (${client}):</b><br><br>`;
@@ -450,7 +986,7 @@
             msgDiv.classList.add("message", sender);
             msgDiv.innerHTML = content;
             chatBox.appendChild(msgDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollChatToBottom();
             return msgDiv;
         }
 
