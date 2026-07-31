@@ -63,7 +63,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = genai.Client()
+# --- Explicit API Key Initialization for Free Tier ---
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    logger.warning("GEMINI_API_KEY environment variable is not set!")
+
+# Passing api_key forces standard API Key auth instead of GCP OAuth credentials
+client = genai.Client(api_key=api_key)
 
 # In-memory registry for active client contexts
 CLIENT_REGISTRY: Set[str] = {"fral", "Default Client"}
@@ -291,4 +298,5 @@ def process_agent_command(data: CommandRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
