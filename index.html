@@ -46,6 +46,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -129,7 +130,7 @@
         /* Frozen Overlay Styles */
         .frozen-overlay {
             position: absolute;
-            top: 55px; /* Sits below header so Disconnect button is interactive */
+            top: 55px; /* Sits below header so Disconnect button remains interactive */
             left: 0;
             right: 0;
             bottom: 0;
@@ -326,6 +327,17 @@
             background-color: rgba(17, 24, 39, 0.4);
             border-bottom: 1px solid var(--border-subtle);
             overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-medium) transparent;
+        }
+
+        .toolbar::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .toolbar::-webkit-scrollbar-thumb {
+            background-color: var(--border-medium);
+            border-radius: 4px;
         }
 
         .toolbar-btn {
@@ -379,6 +391,7 @@
             border-radius: 12px;
             font-size: 0.9rem;
             line-height: 1.6;
+            white-space: pre-wrap;
             word-break: break-word;
             animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -418,6 +431,7 @@
             overflow-x: auto;
             font-size: 0.82rem;
             border: 1px solid var(--border-subtle);
+            white-space: pre-wrap;
         }
 
         .message img {
@@ -477,7 +491,7 @@
             background-color: rgba(15, 23, 42, 0.8);
             border-top: 1px solid var(--border-subtle);
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             gap: 12px;
         }
 
@@ -488,9 +502,10 @@
             align-items: center;
         }
 
-        .input-wrapper input {
+        /* Dynamic Multi-line Textarea Styling */
+        .input-wrapper textarea {
             width: 100%;
-            padding: 12px 16px;
+            padding: 10px 16px;
             background-color: var(--bg-input);
             border: 1px solid var(--border-subtle);
             border-radius: 10px;
@@ -498,16 +513,21 @@
             font-family: var(--font-sans);
             font-size: 0.9rem;
             outline: none;
-            transition: all 0.2s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            resize: none;
+            height: 42px;
+            max-height: 140px;
+            line-height: 1.4;
+            overflow-y: auto;
         }
 
-        .input-wrapper input:focus {
+        .input-wrapper textarea:focus {
             border-color: var(--brand-accent);
             box-shadow: 0 0 0 3px var(--brand-glow);
             background-color: var(--bg-surface);
         }
 
-        .input-wrapper input::placeholder {
+        .input-wrapper textarea::placeholder {
             color: var(--text-muted);
         }
 
@@ -515,12 +535,14 @@
             background-color: var(--brand-primary);
             border: none;
             color: white;
-            padding: 12px;
+            width: 42px;
+            height: 42px;
             border-radius: 10px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
             transition: all 0.2s ease;
             box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
         }
@@ -542,18 +564,32 @@
         }
 
         @media (max-width: 640px) {
+            body {
+                padding: 0;
+            }
+
+            .chat-container {
+                border-radius: 0;
+                height: 100vh;
+                height: 100dvh;
+            }
+
             .chat-header {
                 padding: 12px 16px;
             }
+            
             .toolbar {
                 padding: 8px 16px;
             }
+            
             .chat-box {
                 padding: 16px;
             }
+            
             .input-container {
                 padding: 12px 16px;
             }
+
             .message {
                 max-width: 90%;
             }
@@ -565,7 +601,7 @@
     <!-- SECTION 1: Gate Screen (Initial Wallet Login) -->
     <div id="gateScreen" class="gate-container">
         <h2>🌐 NorTA AI Login</h2>
-        <p></p>
+        <p>Connect your Nimiq Wallet to authenticate and access the terminal context.</p>
         <button id="connectBtn" class="gate-btn" onclick="handleWalletConnect()">Connect Nimiq Wallet</button>
         <p id="gateError" style="color: #f87171; font-size: 0.85rem; margin-top: 12px; margin-bottom: 0;"></p>
     </div>
@@ -577,7 +613,7 @@
         <div id="frozenOverlay" class="frozen-overlay">
             <div class="frozen-card">
                 <h3>❄️ Terminal Access Locked</h3>
-                <p></p>
+                <p>Sign an off-chain authorization message to unfreeze full agent operations.</p>
                 <button class="view-btn" onclick="handleViewTerminal()">View Terminal</button>
                 <p id="payError" style="color: #f87171; font-size: 0.85rem; margin-top: 12px; margin-bottom: 0;"></p>
             </div>
@@ -620,7 +656,7 @@
 
         <div class="input-container">
             <div class="input-wrapper">
-                <input type="text" id="userInput" placeholder="Ask NorTA..." onkeydown="handleKeyPress(event)">
+                <textarea id="userInput" placeholder="Ask NorTA... (Ctrl+Enter to send)" rows="1" onkeydown="handleKeyPress(event)" oninput="autoResize(this)"></textarea>
             </div>
             <button class="send-btn" id="sendBtn" onclick="sendCommand()" aria-label="Send Command">
                 <svg viewBox="0 0 24 24">
@@ -640,6 +676,25 @@
         const hubApi = new HubApi('https://hub.nimiq.com');
 
         let currentContext = "";
+
+        // Helper function to sanitize text output
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+        // Auto-expand/shrink textarea dynamically based on content height
+        function autoResize(textarea) {
+            textarea.style.height = '42px';
+            textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
+        }
 
         // Page Load Session Check
         window.addEventListener("DOMContentLoaded", () => {
@@ -794,11 +849,11 @@
                 });
 
                 if (res.ok) {
-                    appendMessage(`➕ Created new client context: '<b>${name.trim()}</b>'`, "bot");
+                    appendMessage(`➕ Created new client context: '<b>${escapeHTML(name.trim())}</b>'`, "bot");
                     await loadClients(name.trim());
                 }
             } catch (err) {
-                appendMessage(`⚠️ Error creating client: ${err.message}`, "bot");
+                appendMessage(`⚠️ Error creating client: ${escapeHTML(err.message)}`, "bot");
             }
         }
 
@@ -811,7 +866,7 @@
             document.getElementById("activeClientTag").innerText = client;
 
             if (currentContext && currentContext !== client) {
-                appendContextDivider(`Switched context to ${client}`);
+                appendContextDivider(`Switched context to ${escapeHTML(client)}`);
             }
             currentContext = client;
         }
@@ -822,7 +877,7 @@
             div.className = "context-divider";
             div.innerHTML = `<span>${label}</span>`;
             chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollChatToBottom();
         }
 
         function makeImgTag(b64String) {
@@ -841,8 +896,10 @@
 
             if (!text) return;
 
-            appendMessage(text, "user");
+            appendMessage(escapeHTML(text), "user");
             input.value = "";
+            input.style.height = '42px'; // Reset input height
+
             const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Processing command...`, "bot");
 
             try {
@@ -858,36 +915,36 @@
                         let outHtml = "🎯 <b>Execution Summary:</b><br>";
                         data.actions_executed.forEach(act => {
                             if (act.action === "add_task") {
-                                outHtml += `✅ Added Task: "${act.title}" (${act.priority})<br>`;
+                                outHtml += `✅ Added Task: "${escapeHTML(act.title)}" (${act.priority})<br>`;
                             } else if (act.action === "register_employee") {
-                                outHtml += `👤 Registered Employee: ${act.name} (ID: ${act.employee_id})<br>`;
+                                outHtml += `👤 Registered Employee: ${escapeHTML(act.name)} (ID: ${act.employee_id})<br>`;
                             } else if (act.action === "list_tasks") {
-                                outHtml += `📋 Listed Tasks for '${client}'${makeImgTag(act.image)}<br>`;
+                                outHtml += `📋 Listed Tasks for '${escapeHTML(client)}'${makeImgTag(act.image)}<br>`;
                             } else if (act.action === "list_employees") {
-                                outHtml += `👥 Listed Employees for '${client}'${makeImgTag(act.image)}<br>`;
+                                outHtml += `👥 Listed Employees for '${escapeHTML(client)}'${makeImgTag(act.image)}<br>`;
                             } else if (act.action === "view_database") {
                                 outHtml += `📊 Fetched Full DB State${makeImgTag(act.images?.employees)}${makeImgTag(act.images?.tasks)}<br>`;
                             } else if (act.action === "general_chat") {
-                                outHtml += `💬 ${act.reply}<br>`;
+                                outHtml += `💬 ${escapeHTML(act.reply)}<br>`;
                             } else {
-                                outHtml += `⚙️ Executed ${act.action}<br>`;
+                                outHtml += `⚙️ Executed ${escapeHTML(act.action)}<br>`;
                             }
                         });
                         loadingDiv.innerHTML = outHtml;
                     } else {
-                        loadingDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                        loadingDiv.innerHTML = `<pre>${escapeHTML(JSON.stringify(data, null, 2))}</pre>`;
                     }
                 } else {
-                    loadingDiv.innerHTML = `Error: ${data.detail || 'Command failed.'}`;
+                    loadingDiv.innerHTML = `Error: ${escapeHTML(data.detail || 'Command failed.')}`;
                 }
             } catch (err) {
-                loadingDiv.innerHTML = `⚠️ Connection error: ${err.message}`;
+                loadingDiv.innerHTML = `⚠️ Connection error: ${escapeHTML(err.message)}`;
             }
         }
 
         async function fetchEmployees() {
             const client = getActiveClient();
-            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching employees for '${client}'...`, "bot");
+            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching employees for '${escapeHTML(client)}'...`, "bot");
             try {
                 const res = await fetch(`${BASE_URL}/employees/list?client_name=${encodeURIComponent(client)}`, {
                     headers: getAuthHeaders()
@@ -896,25 +953,25 @@
                 
                 let html = "";
                 if (!data.employees || data.employees.length === 0) {
-                    html = `No employees registered under '${client}'.`;
+                    html = `No employees registered under '${escapeHTML(client)}'.`;
                 } else {
-                    html = `👥 <b>Employee Directory (${client}):</b><br>`;
+                    html = `👥 <b>Employee Directory (${escapeHTML(client)}):</b><br>`;
                     data.employees.forEach(e => {
                         const salary = e.salary ? Number(e.salary).toLocaleString() : '0';
-                        html += `• [ID: ${e.id}] ${e.name} - ${e.role} ($${salary}/mo)<br>`;
+                        html += `• [ID: ${e.id}] ${escapeHTML(e.name)} - ${escapeHTML(e.role)} ($${salary}/mo)<br>`;
                     });
                 }
 
                 html += makeImgTag(data.image);
                 loadingDiv.innerHTML = html;
             } catch (err) {
-                loadingDiv.innerHTML = `⚠️ Error fetching employees: ${err.message}`;
+                loadingDiv.innerHTML = `⚠️ Error fetching employees: ${escapeHTML(err.message)}`;
             }
         }
 
         async function fetchTasks() {
             const client = getActiveClient();
-            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching tasks for '${client}'...`, "bot");
+            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching tasks for '${escapeHTML(client)}'...`, "bot");
             try {
                 const res = await fetch(`${BASE_URL}/tasks/list?client_name=${encodeURIComponent(client)}`, {
                     headers: getAuthHeaders()
@@ -923,31 +980,31 @@
                 
                 let html = "";
                 if (!data.tasks || data.tasks.length === 0) {
-                    html = `No active tasks found for '${client}'.`;
+                    html = `No active tasks found for '${escapeHTML(client)}'.`;
                 } else {
-                    html = `📋 <b>Tasks for ${client}:</b><br>`;
+                    html = `📋 <b>Tasks for ${escapeHTML(client)}:</b><br>`;
                     data.tasks.forEach(t => {
-                        html += `• [ID: ${t.id || 'N/A'}] (${t.priority}) ${t.title}<br>`;
+                        html += `• [ID: ${t.id || 'N/A'}] (${t.priority}) ${escapeHTML(t.title)}<br>`;
                     });
                 }
 
                 html += makeImgTag(data.image);
                 loadingDiv.innerHTML = html;
             } catch (err) {
-                loadingDiv.innerHTML = `⚠️ Error fetching tasks: ${err.message}`;
+                loadingDiv.innerHTML = `⚠️ Error fetching tasks: ${escapeHTML(err.message)}`;
             }
         }
 
         async function fetchDbOverview() {
             const client = getActiveClient();
-            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching full DB overview for '${client}'...`, "bot");
+            const loadingDiv = appendMessage(`<span class="spinner-inline"></span>Fetching full DB overview for '${escapeHTML(client)}'...`, "bot");
             try {
                 const res = await fetch(`${BASE_URL}/database/state?client_name=${encodeURIComponent(client)}`, {
                     headers: getAuthHeaders()
                 });
                 const data = await res.json();
                 
-                let html = `📊 <b>Database State (${client}):</b><br><br>`;
+                let html = `📊 <b>Database State (${escapeHTML(client)}):</b><br><br>`;
                 
                 const emps = data.state?.employees || [];
                 html += `👥 <b>Registered Employees (${emps.length}):</b><br>`;
@@ -955,7 +1012,7 @@
                     html += `&nbsp;&nbsp;(None)<br>`;
                 } else {
                     emps.forEach(e => {
-                        html += `&nbsp;&nbsp;• [ID: ${e.id}] ${e.name} (${e.role}) - $${Number(e.salary || 0).toLocaleString()}/mo<br>`;
+                        html += `&nbsp;&nbsp;• [ID: ${e.id}] ${escapeHTML(e.name)} (${escapeHTML(e.role)}) - $${Number(e.salary || 0).toLocaleString()}/mo<br>`;
                     });
                 }
 
@@ -965,7 +1022,7 @@
                     html += `&nbsp;&nbsp;(None)<br>`;
                 } else {
                     tasks.forEach(t => {
-                        html += `&nbsp;&nbsp;• [ID: ${t.id || 'N/A'}] (${t.priority}) ${t.title}<br>`;
+                        html += `&nbsp;&nbsp;• [ID: ${t.id || 'N/A'}] (${t.priority}) ${escapeHTML(t.title)}<br>`;
                     });
                 }
 
@@ -976,7 +1033,7 @@
 
                 loadingDiv.innerHTML = html;
             } catch (err) {
-                loadingDiv.innerHTML = `⚠️ Error fetching DB state: ${err.message}`;
+                loadingDiv.innerHTML = `⚠️ Error fetching DB state: ${escapeHTML(err.message)}`;
             }
         }
 
@@ -991,7 +1048,12 @@
         }
 
         function handleKeyPress(e) {
-            if (e.key === "Enter") sendCommand();
+            // Send on Ctrl+Enter or Cmd+Enter
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                sendCommand();
+            }
+            // Regular Enter inserts a newline
         }
     </script>
 </body>
